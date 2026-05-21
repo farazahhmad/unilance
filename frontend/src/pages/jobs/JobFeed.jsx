@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+
+import { useEffect, useState, useContext } from 'react';
 import API from '../../api/axios';
 import JobCard from '../../components/jobs/JobCard';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search, SlidersHorizontal, AlertTriangle } from 'lucide-react';
+import { AuthContext } from '../../context/AuthContext';
 
 const JobFeed = () => {
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { user } = useContext(AuthContext);
 
     useEffect(() => {
         const fetchJobs = async () => {
@@ -22,6 +25,17 @@ const JobFeed = () => {
     }, []);
 
     if (loading) return <div className="p-10 text-center font-medium">Loading opportunities...</div>;
+
+    // Only workers can see the feed
+    if (!user || user.role !== 'worker') {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+                <AlertTriangle size={48} className="text-yellow-500 mb-4" />
+                <h2 className="text-2xl font-bold mb-2">Access Restricted</h2>
+                <p className="text-gray-600 mb-6">Only workers can view and apply for gigs. Please log in as a worker.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20">

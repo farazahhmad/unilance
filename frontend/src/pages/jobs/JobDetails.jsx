@@ -51,57 +51,9 @@ const JobDetails = () => {
         fetchJob();
         checkApplied();
     }, [id, user]);
-
-    const handleApply = async (e) => {
-        e.preventDefault();
-        
-        // Validation
-        if (proposal.proposalText.length < 20) {
-            toast.error("Proposal text must be at least 20 characters.");
-            return;
-        }
-        if (!proposal.proposedPrice || isNaN(proposal.proposedPrice) || proposal.proposedPrice <= 0) {
-            toast.error("Please enter a valid bid amount.");
-            return;
-        }
-        if (!proposal.estimatedDays || isNaN(proposal.estimatedDays) || proposal.estimatedDays <= 0) {
-            toast.error("Please enter a valid number of days.");
-            return;
-        }
-        
-        setSubmitting(true);
-        try {
-            await API.post(`/proposals/apply/${id}`, proposal);
-            toast.success("Application submitted successfully!");
-            setHasApplied(true);
-            setShowApply(false);
-            setProposal({ proposalText: '', proposedPrice: '', estimatedDays: '' }); // Reset form
-            navigate('/dashboard'); // Redirect to dashboard
-        } catch (err) {
-            toast.error(err.response?.data?.message || "Failed to apply.");
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const nextImage = () => {
-        if (job?.images?.length) {
-            setCurrentImageIndex((prev) => (prev + 1) % job.images.length);
-        }
-    };
-
-    const prevImage = () => {
-        if (job?.images?.length) {
-            setCurrentImageIndex((prev) => (prev - 1 + job.images.length) % job.images.length);
-        }
-    };
-
-    if (loading) return <div className="p-20 text-center">Loading details...</div>;
-
     return (
         <div className="min-h-screen bg-gray-50 py-10 px-4">
             <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-                
                 {/* Left Column: Job Info */}
                 <div className="md:col-span-2 space-y-6">
                     <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
@@ -160,69 +112,104 @@ const JobDetails = () => {
                                 )}
                             </div>
                         )}
-                        
-                        <h3 className="text-lg font-bold mb-3">Description</h3>
-                        <p className="text-gray-600 leading-relaxed whitespace-pre-line">
-                            {job.description}
-                        </p>
-                    </div>
-                </div>
 
-                {/* Right Column: Action Card */}
-                <div className="space-y-6">
-                    <div className="bg-white p-6 rounded-3xl shadow-lg border border-blue-50">
-                        <p className="text-sm text-gray-500 mb-1">Budget Range</p>
-                        <h2 className="text-3xl font-black text-blue-600 flex items-center gap-1 mb-6">
-                            <IndianRupee size={24} /> {job.budget}
-                        </h2>
+                        <div className="flex flex-col md:flex-row gap-4 mt-8">
+                            <div className="flex-1">
+                                <h2 className="text-lg font-bold mb-2">Description</h2>
+                                <p className="text-gray-700 mb-4">{job.description}</p>
+                                <h2 className="text-lg font-bold mb-2">Skills Required</h2>
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {job.skills && job.skills.length > 0 ? job.skills.map((skill, idx) => (
+                                        <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">{skill}</span>
+                                    )) : <span className="text-gray-400">No skills listed</span>}
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <h2 className="text-lg font-bold mb-2">Budget & Timeline</h2>
+                                <p className="text-gray-700 mb-2"><IndianRupee size={16}/> <span className="font-bold">{job.budget}</span></p>
+                                <p className="text-gray-700 mb-2"><Calendar size={16}/> {job.timeline || 'Flexible'}</p>
+                                <p className="text-gray-700 mb-2"><MapPin size={16}/> {job.college}</p>
+                            </div>
+                        </div>
 
-                        {!showApply ? (
-                            hasApplied ? (
-                                <button 
-                                    disabled
-                                    className="w-full bg-gray-400 text-white font-bold py-4 rounded-2xl cursor-not-allowed flex items-center justify-center gap-2"
-                                >
-                                    Applied <Send size={18}/>
-                                </button>
-                            ) : (
-                                <button 
-                                    onClick={() => setShowApply(true)}
-                                    className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition flex items-center justify-center gap-2"
-                                >
-                                    Apply for this gig <Send size={18}/>
-                                </button>
-                            )
-                        ) : (
-                            <form onSubmit={handleApply} className="space-y-4 animate-in fade-in duration-300">
-                                <textarea 
-                                    placeholder="Why are you the best fit?"
+                        {/* Apply Button/Form - Only for workers */}
+                        {user?.role === 'worker' && !hasApplied && !showApply && (
+                            <button
+                                onClick={() => setShowApply(true)}
+                                className="mt-8 w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"
+                            >
+                                <Send size={18}/> Apply for this Gig
+                            </button>
+                        )}
+
+                        {/* Application Form */}
+                        {user?.role === 'worker' && showApply && !hasApplied && (
+                            <form onSubmit={handleApply} className="mt-8 bg-blue-50 p-6 rounded-2xl">
+                                <h3 className="font-bold text-lg mb-4">Submit Your Proposal</h3>
+                                <textarea
+                                    className="w-full p-3 rounded-xl border border-gray-200 mb-4"
+                                    rows={4}
+                                    placeholder="Describe why you're the best fit..."
+                                    value={proposal.proposalText}
+                                    onChange={e => setProposal({ ...proposal, proposalText: e.target.value })}
                                     required
-                                    className="w-full p-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none h-32"
-                                    onChange={(e) => setProposal({...proposal, proposalText: e.target.value})}
                                 />
-                                <input 
-                                    type="number"
-                                    placeholder="Your Bid (₹)"
-                                    required
-                                    className="w-full p-3 bg-gray-50 border rounded-xl outline-none"
-                                    onChange={(e) => setProposal({...proposal, proposedPrice: e.target.value})}
-                                />
-                                <input 
-                                    type="number"
-                                    placeholder="Days to Complete"
-                                    required
-                                    className="w-full p-3 bg-gray-50 border rounded-xl outline-none"
-                                    onChange={(e) => setProposal({...proposal, estimatedDays: e.target.value})}
-                                />
-                                <div className="flex gap-2">
-                                    <button type="submit" disabled={submitting} className="flex-1 bg-green-600 text-white font-bold py-3 rounded-xl disabled:opacity-50">
-                                        {submitting ? "Submitting..." : "Submit"}
+                                <div className="flex gap-4 mb-4">
+                                    <input
+                                        type="number"
+                                        className="flex-1 p-3 rounded-xl border border-gray-200"
+                                        placeholder="Your Bid (₹)"
+                                        value={proposal.proposedPrice}
+                                        onChange={e => setProposal({ ...proposal, proposedPrice: e.target.value })}
+                                        required
+                                    />
+                                    <input
+                                        type="number"
+                                        className="flex-1 p-3 rounded-xl border border-gray-200"
+                                        placeholder="Days to Complete"
+                                        value={proposal.estimatedDays}
+                                        onChange={e => setProposal({ ...proposal, estimatedDays: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="flex gap-4">
+                                    <button
+                                        type="submit"
+                                        className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition"
+                                        disabled={submitting}
+                                    >
+                                        {submitting ? 'Submitting...' : 'Submit Proposal'}
                                     </button>
-                                    <button type="button" onClick={() => setShowApply(false)} className="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl">X</button>
+                                    <button
+                                        type="button"
+                                        className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition"
+                                        onClick={() => setShowApply(false)}
+                                        disabled={submitting}
+                                    >
+                                        Cancel
+                                    </button>
                                 </div>
                             </form>
                         )}
+
+                        {/* Already Applied Message */}
+                        {user?.role === 'worker' && hasApplied && (
+                            <div className="mt-8 bg-green-50 text-green-700 p-4 rounded-xl font-bold text-center">
+                                You have already applied for this gig.
+                            </div>
+                        )}
+                        {/* If client, show info message */}
+                        {user?.role === 'client' && (
+                            <div className="mt-8 bg-yellow-50 text-yellow-700 p-4 rounded-xl font-bold text-center">
+                                Clients cannot apply for gigs. Switch to a worker account to apply.
+                            </div>
+                        )}
                     </div>
+                </div>
+
+                {/* Right Column: Sidebar (optional) */}
+                <div className="space-y-6">
+                    {/* ...other sidebar content... */}
                 </div>
             </div>
         </div>

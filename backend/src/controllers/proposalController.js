@@ -22,6 +22,7 @@ exports.applyToJob = async (req, res) => {
         });
         await newProposal.save();
 
+
         // 3. SEND NOTIFICATION TO CLIENT
         try {
             await sendEmail({
@@ -30,8 +31,20 @@ exports.applyToJob = async (req, res) => {
                 message: `Hi ${job.clientId.name}, a student has applied for your job "${job.title}". \n\nBid: ₹${proposedPrice} \nLog in to UniLance to review the proposal.`
             });
         } catch (err) {
-            console.error("Notification email failed:", err);
-            
+            console.error("Notification email to client failed:", err);
+        }
+
+        // 4. SEND NOTIFICATION TO WORKER
+        try {
+            // Populate worker details
+            const worker = req.user;
+            await sendEmail({
+                email: worker.email,
+                subject: `Application Submitted: ${job.title}`,
+                message: `Hi ${worker.name}, your application for the job "${job.title}" has been submitted successfully.\n\nBid: ₹${proposedPrice}\nThe client will review your proposal and contact you if interested. Good luck!`
+            });
+        } catch (err) {
+            console.error("Notification email to worker failed:", err);
         }
 
         res.status(201).json({ success: true, message: "Proposal submitted!" });

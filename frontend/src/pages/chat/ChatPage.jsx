@@ -7,106 +7,116 @@ import { Send, CheckCircle } from 'lucide-react';
 
 const ChatPage = () => {
     const { roomId } = useParams(); 
-    const { user } = useContext(AuthContext);
+    const { user, loading: userLoading } = useContext(AuthContext);
     const [message, setMessage] = useState("");
     const [chatLog, setChatLog] = useState([]);
     const [loading, setLoading] = useState(true);
     const scrollRef = useRef();
     const socketRef = useRef(null);
+    const listenerAttachedRef = useRef(false);
 
-    // Initialize socket connection
+    // Initialize socket connection (run once)
     useEffect(() => {
         if (!socketRef.current) {
+            console.log('Initializing socket connection...');
             socketRef.current = io("http://localhost:3000", {
                 transports: ["websocket", "polling"],
             });
             
             socketRef.current.on('connect', () => {
                 console.log('Socket connected:', socketRef.current.id);
+                // When socket connects, setup listeners and join room
+                setupSocketListeners();
             });
 
             socketRef.current.on('disconnect', () => {
                 console.log('Socket disconnected');
+                listenerAttachedRef.current = false;
             });
         }
 
         return () => {
-            // Don't disconnect, just cleanup listeners
+            // Don't disconnect, just cleanup on unmount
         };
     }, []);
 
-    // 1. Load Chat History from MongoDB on Mount
-    useEffect(() => {
-        const fetchHistory = async () => {
-            try {
-                const res = await API.get(`/chat/history/${roomId}`);
-                console.log('Loaded chat history:', res.data.messages);
-                // Map DB fields to the state format
-                const history = res.data.messages.map(msg => ({
-                    room: msg.jobId,
-                    author: msg.senderName,
-                    senderId: msg.senderId,
-                    message: msg.text,
-                    time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }));
-                setChatLog(history);
-            } catch (err) {
-                console.error("Failed to load history", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (roomId) fetchHistory();
-    }, [roomId]);
-
-    // 2. Socket.io Real-time Listeners
-    useEffect(() => {
-        if (!roomId || !socketRef.current) {
-            console.warn('Socket not ready:', { roomId, socketReady: !!socketRef.current });
+    // Setup socket listeners (only once per socket)
+    const setupSocketListeners = () => {
+        if (listenerAttachedRef.current || !socketRef.current || !roomId) {
             return;
         }
-
-        const socket = socketRef.current;
-        console.log('=== SETTING UP SOCKET LISTENERS ===');
-        console.log('Joining room:', roomId);
-        console.log('Socket connected:', socket.connected);
-        console.log('Socket listeners before join:', socket.listeners('receive_message'));
         
+        console.log('Setting up socket listeners for room:', roomId);
+        const socket = socketRef.current;
+        
+        // Join the room
         socket.emit("join_room", roomId);
+        listenerAttachedRef.current = true;
 
         const handleReceiveMessage = (data) => {
-            console.log('=== MESSAGE RECEIVED ===');
-            console.log('Raw data:', data);
-            console.log('Current user ID:', user?._id);
-            console.log('Sender ID:', data.senderId);
+            console.log('=== MESSAGE RECEIVED ===', data);
             
             setChatLog((prev) => {
-                // Prevent duplicate messages
-                const isDuplicate = prev.some(msg => 
-                    msg.message === data.message && 
-                    msg.senderId === data.senderId &&
-                    msg.author === data.author
-                );
-                if (isDuplicate) {
+                // Prevent duplicate messages by checking _id
+                if (data._id && prev.some(msg => msg._id === data._id)) {
                     console.log('Duplicate message prevented');
                     return prev;
                 }
-                console.log('Adding message to chatLog. New length:', prev.length + 1);
+                
+                // If server sends back a message with _id, replace the optimistic one
+                if (data._id) {
+                    const hasOptimistic = prev.some(msg => 
+                        msg.message === data.message && 
+                        msg.senderId === data.senderId &&
+                        !msg._id
+                    );
+                    if (hasOptimistic) {
+                        console.log('Replacing optimistic message with DB version');
+                        return prev.map(msg => 
+                            msg.message === data.message && 
+                            msg.senderId === data.senderId &&
+                            !msg._id ? { ...data } : msg
+                        );
+                    }
+                }
+                
                 return [...prev, data];
             });
         };
 
         socket.on("receive_message", handleReceiveMessage);
         console.log('receive_message listener attached');
+    };
 
-        return () => {
-            console.log('Cleaning up receive_message listener');
-            socket.off("receive_message", handleReceiveMessage);
-        };
-    }, [roomId, user?._id]);
+    // Load chat history when user is ready and roomId changes
+    useEffect(() => {
+        if (!userLoading && roomId) {
+            const fetchHistory = async () => {
+                try {
+                    const res = await API.get(`/chat/history/${roomId}`);
+                    console.log('Loaded chat history:', res.data.messages);
+                    const history = res.data.messages.map(msg => ({
+                        room: msg.jobId,
+                        author: msg.senderName,
+                        senderId: msg.senderId,
+                        message: msg.text,
+                        _id: msg._id,
+                        time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        createdAt: msg.createdAt
+                    }));
+                    setChatLog(history);
+                } catch (err) {
+                    console.error("Failed to load history", err);
+                } finally {
+                    setLoading(false);
+                }
+            };
 
-    // 3. Auto-scroll to bottom
+            fetchHistory();
+        }
+    }, [roomId, userLoading]);
+
+    // Auto-scroll to bottom
     useEffect(() => {
         scrollRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chatLog]);
@@ -137,12 +147,14 @@ const ChatPage = () => {
         console.log('Socket connected:', socketRef.current?.connected);
         console.log('Socket ID:', socketRef.current?.id);
         
-        // Emit to server - server will broadcast back to all clients including sender
+        // OPTIMISTIC UPDATE: Add message to local state immediately
+        setChatLog((prev) => [...prev, messageData]);
+        setMessage("");
+        
+        // Then emit to server - server will save to DB and broadcast to other clients
         socketRef.current.emit("send_message", messageData, (ack) => {
             console.log('Server acknowledgement:', ack);
         });
-        
-        setMessage("");
     };
 
     if (loading) return <div className="h-screen flex items-center justify-center text-white bg-slate-900">Loading conversation...</div>;

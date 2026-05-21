@@ -1,3 +1,4 @@
+import Home from './pages/Home';
 import { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
@@ -13,13 +14,9 @@ import ClientDashboard from './pages/dashboard/ClientDashboard';
 import JobProposals from './pages/dashboard/JobProposals';
 import WorkerDashboard from './pages/dashboard/WorkerDashboard';
 import ChatPage from './pages/chat/ChatPage';
+import MessagesPage from './pages/chat/MessagesPage';
 
-const Home = () => (
-  <div className="p-10">
-    <h1 className="text-3xl font-bold">Welcome to UniLance</h1>
-    <p className="mt-3 text-gray-600">Please login or register to continue.</p>
-  </div>
-);
+
 
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
@@ -48,8 +45,8 @@ function App() {
           <Route path="/jobs/:id" element={<JobDetails />} />
           <Route path="/create-job" element={<CreateJob />} />
           <Route path="/dashboard/proposals/:id" element={<JobProposals />} />
+          <Route path="/messages" element={<MessagesPage />} />
           <Route path="/chat/:roomId" element={<ChatPage />} />
-
         </Routes>
       </Router>
     </AuthProvider>

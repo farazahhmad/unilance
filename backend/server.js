@@ -89,11 +89,14 @@ startServer();
 // 7. Handle uncaught exceptions
 process.on("uncaughtException", (error) => {
   console.error("Uncaught Exception:", error);
-  process.exit(1);
+  // Only exit for critical errors, log and continue for non-critical ones
+  if (error.code === "ERR_HTTP_REQUEST_TIMEOUT") {
+    process.exit(1);
+  }
 });
 
 // 8. Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+  // Log but don't exit for unhandled rejections - let the server continue
 });

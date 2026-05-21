@@ -7,6 +7,15 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // Normalize user object to ensure _id is set (handle both old 'id' and new '_id' formats)
+    const normalizeUser = (userData) => {
+        if (!userData) return null;
+        return {
+            ...userData,
+            _id: userData._id || userData.id || null
+        };
+    };
+
     // Check if user is already logged in (on page load)
     useEffect(() => {
         const checkLoggedIn = async () => {
@@ -14,7 +23,7 @@ export const AuthProvider = ({ children }) => {
                 const token = localStorage.getItem('token');
                 if (token) {
                     const res = await API.get('/auth/me'); 
-                    setUser(res.data.user);
+                    setUser(normalizeUser(res.data.user));
                 }
             } catch (err) {
                 localStorage.removeItem('token');
@@ -27,7 +36,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = (userData, token) => {
         localStorage.setItem('token', token);
-        setUser(userData);
+        setUser(normalizeUser(userData));
     };
 
     const logout = () => {
