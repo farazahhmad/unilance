@@ -6,6 +6,18 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Name is required'],
     trim: true 
   },
+  username: {
+    type: String,
+    required: [true, 'Username is required'],
+    unique: true,
+    trim: true,
+    lowercase: true,
+    match: [/^[a-zA-Z0-9_\.]{3,30}$/, 'Username must be 3-30 characters, alphanumeric, underscore or dot.']
+  },
+  profilePhoto: {
+    type: String, // URL or path to the profile photo
+    default: ''
+  },
   email: { 
     type: String, 
     required: [true, 'Email is required'],

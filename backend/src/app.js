@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require('path');
 
 // 1. Initialize app
 const app = express();
@@ -24,6 +25,11 @@ app.use("/api/auth", authRoutes);
 app.use('/api/test', testRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/proposals', proposalRoutes);
+const userRoutes = require('./routes/userRoutes');
+app.use('/api/users', userRoutes);
+
+// Serve uploaded profile photos statically
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 // 5. Error handling middleware
 app.use((err, req, res, next) => {

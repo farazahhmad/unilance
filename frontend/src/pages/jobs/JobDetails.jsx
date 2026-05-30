@@ -51,6 +51,37 @@ const JobDetails = () => {
         fetchJob();
         checkApplied();
     }, [id, user]);
+
+    const prevImage = () => {
+        setCurrentImageIndex(prev => (prev === 0 ? (job?.images?.length || 1) - 1 : prev - 1));
+    };
+
+    const nextImage = () => {
+        setCurrentImageIndex(prev => (prev === (job?.images?.length || 1) - 1 ? 0 : prev + 1));
+    };
+
+    const handleApply = async (e) => {
+        e.preventDefault();
+        setSubmitting(true);
+
+        try {
+            const res = await API.post('/proposals/submit', {
+                jobId: id,
+                proposalText: proposal.proposalText,
+                proposedPrice: proposal.proposedPrice,
+                estimatedDays: proposal.estimatedDays
+            });
+
+            toast.success('Proposal submitted successfully!');
+            setShowApply(false);
+            setProposal({ proposalText: '', proposedPrice: '', estimatedDays: '' });
+            setHasApplied(true);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to submit proposal');
+        } finally {
+            setSubmitting(false);
+        }
+    };
     return (
         <div className="min-h-screen bg-gray-50 py-10 px-4">
             <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
